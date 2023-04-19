@@ -1,27 +1,43 @@
 import requests
-import json
+import os
 
-# Replace YOUR_API_KEY with your actual osu! API key
-API_KEY = "YOUR_API_KEY"
-USER_ID = "6522897"
+api_key = 'your_osu_api_key'
+user_id = 'your_user_id'
+osu_songs_folder = 'your_file_path'
+osu_email = 'your_osu_email'
+osu_password = 'your_osu_password'
 
-def get_user_best(user_id, api_key):
-    url = f"https://osu.ppy.sh/api/get_user_best?k={api_key}&u={user_id}&limit=100"
-    response = requests.get(url)
-    return json.loads(response.text)
+def get_recently_played_beatmaps(session):
+    url = f'https://osu.ppy.sh/api/get_user_recent?k={api_key}&u={user_id}&limit=150'
+    response = session.get(url)
+    return response.json()
 
-def download_beatmap(beatmap_id, folder="beatmaps"):
-    url = f"https://osu.ppy.sh/beatmapsets/{beatmap_id}/download"
-    response = requests.get(url)
-    with open(f"{folder}/{beatmap_id}.osz", "wb") as file:
-        file.write(response.content)
+def get_top_performance_beatmaps(session):
+    url = f'https://osu.ppy.sh/api/get_user_best?k={api_key}&u={user_id}&limit=150'
+    response = session.get(url)
+    return response.json()
 
-def main():
-    user_best = get_user_best(USER_ID, API_KEY)
-    for score in user_best:
-        beatmap_id = score["beatmap_id"]
-        print(f"Downloading beatmap {beatmap_id}")
-        download_beatmap(beatmap_id)
+def download_beatmap(session, beatmapset_id):
+    url = f'https://osu.ppy.sh/beatmapsets/{beatmapset_id}/download'
+    response = session.get(url)
+    with open(os.path.join(osu_songs_folder, f'{beatmapset_id}.osz'), 'wb') as f:
+        f.write(response.content)
 
-if __name__ == "__main__":
-    main()
+def login_to_osu(session, email, password):
+    url = 'https://osu.ppy.sh/session'
+    payload = {
+        "username": email,
+        "password": password,
+    }
+    response = session.post(url, data=payload)
+
+with requests.Session() as session:
+    login_to_osu(session, osu_email, osu_password)
+    recent_beatmaps = get_recently_played_beatmaps(session)
+    top_beatmaps = get_top_performance_beatmaps(session)
+
+    for beatmap in recent_beatmaps:
+        download_beatmap(session, beatmap['beatmap_id'])
+
+    for beatmap in top_beatmaps:
+        download_beatmap(session, beatmap['beatmap_id'])
